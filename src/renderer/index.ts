@@ -1,6 +1,31 @@
 import vertShaderCode from "../shaders/triangle.vert.wgsl";
 import fragShaderCode from "../shaders/triangle.frag.wgsl";
 
+const startTime = (new Date()).getTime()/1000
+
+const getDeltaTime = () => (new Date()).getTime()/1000 - startTime;
+const getDeltaTime2 = () => 0.5;
+
+const uniformData = new Float32Array([
+    // ♟️ ModelViewProjection Matrix (Identity)
+    1.0, 0.0, 0.0, 0.0, 
+    0.0, 1.0, 0.0, 0.0, 
+    0.0, 0.0, 1.0, 0.0, 
+    0.0, 0.0, 0.0, 1.0,
+
+    // 🔴 Primary Color
+    0.9, 0.1, 0.3, 1.0,
+
+    // 🟣 Accent Color
+    0.8, 0.2, 0.8, 1.0,
+
+    //time
+    getDeltaTime(),
+
+    //padding
+    0.0,0.0,0.0
+  ]);
+
 export async function createRenderer(canvas: HTMLCanvasElement) {
     const entry = navigator.gpu;
     if (!entry) {
@@ -92,6 +117,8 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
       passEncoder.drawIndexed(3);
       passEncoder.end();
   
+      uniformData[24] = getDeltaTime();
+      queue.writeBuffer(uniformBuffer, uniformData.byteOffset, uniformData)
       queue.submit([commandEncoder.finish()]);
     };
   
@@ -111,27 +138,6 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
   }
   
   function getUniformData(device: GPUDevice) {
-    // 👔 Uniform Data
-    const uniformData = new Float32Array([
-      // ♟️ ModelViewProjection Matrix (Identity)
-      1.0, 0.0, 0.0, 0.0, 
-      0.0, 1.0, 0.0, 0.0, 
-      0.0, 0.0, 1.0, 0.0, 
-      0.0, 0.0, 0.0, 1.0,
-  
-      // 🔴 Primary Color
-      0.9, 0.1, 0.3, 1.0,
-  
-      // 🟣 Accent Color
-      0.8, 0.2, 0.8, 1.0,
-  
-      //time
-      (new Date()).getTime()/1000,
-  
-      //padding
-      0.0,0.0,0.0
-    ]);
-  
     // ✋ Declare buffer handles
     const uniformBuffer: GPUBuffer = createBuffer(
       device,
