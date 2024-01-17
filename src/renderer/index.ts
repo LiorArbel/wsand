@@ -1,10 +1,17 @@
 import vertShaderCode from "../shaders/triangle.vert.wgsl";
 import fragShaderCode from "../shaders/triangle.frag.wgsl";
 import { setupComputePipeline } from "./computePipeline";
+import { createTexture } from "./createTexture";
+
+const explicitFeatures:string[] = [
+  //"chromium-experimental-read-write-storage-texture"
+];
 
 const startTime = new Date().getTime() / 1000;
 
 const getDeltaTime = () => new Date().getTime() / 1000 - startTime;
+
+const gameSize = {width: 512, height: 512};
 
 const uniformData = new Float32Array([
   // ♟️ ModelViewProjection Matrix (Identity)
@@ -86,7 +93,7 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
 
   const uniformBuffer = getUniformData(device);
 
-  const imageTexture = await loadTexture(device);
+  const imageTexture = createTexture(device);
 
   const { layout, uniformBindGroup } = await getLayoutAndBindGroup(
     device,
@@ -94,7 +101,21 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
     imageTexture
   );
 
-  const encodeCompute = setupComputePipeline(device, imageTexture);
+  const initialData = new Float32Array(gameSize.height * gameSize.width * 3);
+
+  const center = {x: Math.floor(gameSize.width/2), y:Math.floor(gameSize.height/2)}
+  const radius = 10;
+
+  for(let i = center.x-radius/2;i<center.x+radius/2; i++){
+    for(let j = center.y-radius/2; j<center.y+radius/2; j++){
+        const index = (i*gameSize.width + j)*4;
+        initialData[index] = i/radius;
+        initialData[index+1] = i/radius;
+        initialData[index+2] = i/radius;
+    }
+} 
+
+  const encodeCompute = setupComputePipeline(device, imageTexture, gameSize, initialData);
 
   const pipeline = getPipeline(layout, device, fragModule, vertModule);
 
@@ -130,8 +151,6 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
 
     commandEncoder = device.createCommandEncoder();
     
-    encodeCompute(commandEncoder);
-
     // 🖌️ Encode drawing commands
     passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
     passEncoder.setBindGroup(0, uniformBindGroup);
@@ -141,6 +160,8 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
     passEncoder.setVertexBuffer(0, vertBuffer);
     passEncoder.draw(6);
     passEncoder.end();
+
+    encodeCompute(commandEncoder);
 
     uniformData[24] = getDeltaTime();
     queue.writeBuffer(uniformBuffer, uniformData.byteOffset, uniformData);
@@ -171,82 +192,6 @@ function getUniformData(device: GPUDevice) {
   );
   uniformBuffer.mapState;
   return uniformBuffer;
-}
-
-async function loadTexture(device: GPUDevice) {
-  let imageTexture: GPUTexture;
-  {
-    const response = await fetch("/photo.png");
-    // const imageBitmap = await createImageBitmap(await response.blob());
-    const b = [0, 0, 0, 255];
-    const w = [255, 255, 255, 255];
-    const imageBitmap = new Uint8Array(
-      [
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        w,
-        w,
-        b,
-        b,
-        b,
-        b,
-        w,
-        w,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-        b,
-      ].flat()
-    );
-
-    imageTexture = device.createTexture({
-      // size: [imageBitmap.width, imageBitmap.height, 1],
-      size: [6, 6, 1],
-      format: "rgba8unorm",
-      usage:
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.STORAGE_BINDING,
-    });
-    // device.queue.copyExternalImageToTexture(
-    //   { source: imageBitmap },
-    //   { texture: imageTexture },
-    //   [imageBitmap.width, imageBitmap.height]
-    // );
-    device.queue.writeTexture(
-      {
-        texture: imageTexture,
-      },
-      imageBitmap,
-      { bytesPerRow: 6 * 4 },
-      { width: 6, height: 6 }
-    );
-  }
-
-  return imageTexture;
 }
 
 async function getLayoutAndBindGroup(
@@ -319,6 +264,11 @@ async function getAdapter(entry: GPU) {
 
   if (!adapter) {
     throw new Error("Couldn't get adapter.");
+  }
+
+  if(!explicitFeatures.every(f => adapter.features.has(f))){
+    console.error(explicitFeatures, [...adapter.features.values()]);
+    throw new Error("Not all features available!");
   }
 
   return adapter;
