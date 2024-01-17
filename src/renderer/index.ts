@@ -1,5 +1,6 @@
 import vertShaderCode from "../shaders/triangle.vert.wgsl";
 import fragShaderCode from "../shaders/triangle.frag.wgsl";
+import { setupComputePipeline } from "./computePipeline";
 
 const startTime = new Date().getTime() / 1000;
 
@@ -85,10 +86,15 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
 
   const uniformBuffer = getUniformData(device);
 
-  const { layout, uniformBindGroup } = getLayoutAndBindGroup(
+  const imageTexture = await loadTexture(device);
+
+  const { layout, uniformBindGroup } = await getLayoutAndBindGroup(
     device,
-    uniformBuffer
+    uniformBuffer,
+    imageTexture
   );
+
+  const encodeCompute = setupComputePipeline(device, imageTexture);
 
   const pipeline = getPipeline(layout, device, fragModule, vertModule);
 
@@ -123,6 +129,8 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
     };
 
     commandEncoder = device.createCommandEncoder();
+    
+    encodeCompute(commandEncoder);
 
     // 🖌️ Encode drawing commands
     passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
@@ -165,7 +173,87 @@ function getUniformData(device: GPUDevice) {
   return uniformBuffer;
 }
 
-function getLayoutAndBindGroup(device: GPUDevice, uniformBuffer: GPUBuffer) {
+async function loadTexture(device: GPUDevice) {
+  let imageTexture: GPUTexture;
+  {
+    const response = await fetch("/photo.png");
+    // const imageBitmap = await createImageBitmap(await response.blob());
+    const b = [0, 0, 0, 255];
+    const w = [255, 255, 255, 255];
+    const imageBitmap = new Uint8Array(
+      [
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        w,
+        w,
+        b,
+        b,
+        b,
+        b,
+        w,
+        w,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+        b,
+      ].flat()
+    );
+
+    imageTexture = device.createTexture({
+      // size: [imageBitmap.width, imageBitmap.height, 1],
+      size: [6, 6, 1],
+      format: "rgba8unorm",
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.STORAGE_BINDING,
+    });
+    // device.queue.copyExternalImageToTexture(
+    //   { source: imageBitmap },
+    //   { texture: imageTexture },
+    //   [imageBitmap.width, imageBitmap.height]
+    // );
+    device.queue.writeTexture(
+      {
+        texture: imageTexture,
+      },
+      imageBitmap,
+      { bytesPerRow: 6 * 4 },
+      { width: 6, height: 6 }
+    );
+  }
+
+  return imageTexture;
+}
+
+async function getLayoutAndBindGroup(
+  device: GPUDevice,
+  uniformBuffer: GPUBuffer,
+  mainTexture: GPUTexture
+) {
   // 📁 Bind Group Layout
   const uniformBindGroupLayout: GPUBindGroupLayout =
     device.createBindGroupLayout({
@@ -175,8 +263,24 @@ function getLayoutAndBindGroup(device: GPUDevice, uniformBuffer: GPUBuffer) {
           visibility: GPUShaderStage.VERTEX,
           buffer: {},
         },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: {},
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: {},
+        },
       ],
     });
+
+  // Create a sampler with linear filtering for smooth interpolation.
+  const sampler = device.createSampler({
+    magFilter: "nearest",
+    minFilter: "nearest",
+  });
 
   // 🗄️ Bind Group
   // ✍ This would be used when *encoding commands*
@@ -188,6 +292,14 @@ function getLayoutAndBindGroup(device: GPUDevice, uniformBuffer: GPUBuffer) {
         resource: {
           buffer: uniformBuffer,
         },
+      },
+      {
+        binding: 1,
+        resource: sampler,
+      },
+      {
+        binding: 2,
+        resource: mainTexture.createView(),
       },
     ],
   });
@@ -254,37 +366,37 @@ function getVertexBuffer(device: GPUDevice) {
     // color
     0.0, 1.0, 0.0,
     //uv,
-    0.0,0.0,
+    0.0, 0.0,
     // pos
     1.0, -1.0, 0.0,
     //color
     1.0, 0.0, 0.0,
     //uv
-    1.0,0.0,
+    1.0, 0.0,
     // pos
     1.0, 1.0, 0.0,
     //color
     0.0, 0.0, 1.0,
     //uv
-    1.0,1.0,
+    1.0, 1.0,
     // pos
     1.0, 1.0, 0.0,
     //color
     1.0, 0.0, 0.0,
     //uv
-    1.0,1.0,
+    1.0, 1.0,
     // pos
     -1.0, 1.0, 0.0,
     //color
     0.0, 1.0, 0.0,
     //uv
-    0.0,1.0,
+    0.0, 1.0,
     // pos
     -1.0, -1.0, 0.0,
     //color
     0.0, 0.0, 1.0,
     //uv
-    0.0,0.0
+    0.0, 0.0,
   ]);
 
   const vertBuffer = createBuffer(device, verts, GPUBufferUsage.VERTEX);
@@ -344,12 +456,12 @@ function getPipeline(
           },
           {
             shaderLocation: 1, // @location(1)
-            offset: 4*3,
+            offset: 4 * 3,
             format: "float32x3",
           },
           {
             shaderLocation: 2, // @location(2)
-            offset: 4*6,
+            offset: 4 * 6,
             format: "float32x2",
           },
         ],
