@@ -5,7 +5,9 @@
   "author": "<lliorarbell@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "dev": "webpack serve"
+    "start":"webpack serve", 
+    "dev": "webpack serve",
+    "build": "webpack"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.40",
@@ -15,5 +17,8 @@
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.15.1"
   },
-  "private": "true"
+  "private": "true",
+  "dependencies": {
+    "wgpu-matrix": "^2.5.1"
+  }
 }
