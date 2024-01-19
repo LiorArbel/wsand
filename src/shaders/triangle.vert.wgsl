@@ -17,7 +17,13 @@ struct VSOut {
 @vertex
 fn main(@location(0) in_pos: vec3<f32>, @location(1) in_color: vec3<f32>, @location(2) uv: vec2<f32>) -> VSOut {
     var vs_out: VSOut;
-    vs_out.position = uniforms.modelViewProj * vec4<f32>(in_pos, 1.0);
+    let base_view = mat4x4f(
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0, 
+      0.0, 0.0, 1.0, 0.0,
+      0.0, 0.0, 0.0, 1.0
+    );
+    vs_out.position = base_view*uniforms.modelViewProj * vec4<f32>(in_pos, 1.0);
     // vs_out.color = in_color + vec3<f32>(0,0.0,0.0);
     vs_out.color = vec3(uv, 0);
     vs_out.uv = uv;

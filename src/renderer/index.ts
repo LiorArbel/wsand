@@ -11,7 +11,9 @@ const startTime = new Date().getTime() / 1000;
 
 const getDeltaTime = () => new Date().getTime() / 1000 - startTime;
 
-const gameSize = {width: 512, height: 512};
+const gameSize = {width: 12, height: 12};
+
+const FRAME_DELAY = 1000;
 
 const uniformData = new Float32Array([
   // ♟️ ModelViewProjection Matrix (Identity)
@@ -93,7 +95,7 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
 
   const uniformBuffer = getUniformData(device);
 
-  const imageTexture = createTexture(device);
+  const imageTexture = createTexture(device, gameSize);
 
   const { layout, uniformBindGroup } = await getLayoutAndBindGroup(
     device,
@@ -101,21 +103,7 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
     imageTexture
   );
 
-  const initialData = new Float32Array(gameSize.height * gameSize.width * 3);
-
-  const center = {x: Math.floor(gameSize.width/2), y:Math.floor(gameSize.height/2)}
-  const radius = 10;
-
-  for(let i = center.x-radius/2;i<center.x+radius/2; i++){
-    for(let j = center.y-radius/2; j<center.y+radius/2; j++){
-        const index = (i*gameSize.width + j)*4;
-        initialData[index] = i/radius;
-        initialData[index+1] = i/radius;
-        initialData[index+2] = i/radius;
-    }
-} 
-
-  const encodeCompute = setupComputePipeline(device, imageTexture, gameSize, initialData);
+  const encodeCompute = setupComputePipeline(device, imageTexture, gameSize);
 
   const pipeline = getPipeline(layout, device, fragModule, vertModule);
 
@@ -169,15 +157,16 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
   };
 
   const render = () => {
-    // ⏭ Acquire next image from context
     colorTexture = context.getCurrentTexture();
     colorTextureView = colorTexture.createView();
 
-    // 📦 Write and submit commands to queue
     encodeCommands();
 
-    // ➿ Refresh canvas
-    requestAnimationFrame(render);
+    console.log("rendered");
+
+    setTimeout(() => {
+      requestAnimationFrame(render);
+    },FRAME_DELAY)
   };
 
   return render;
@@ -190,7 +179,6 @@ function getUniformData(device: GPUDevice) {
     uniformData,
     GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
   );
-  uniformBuffer.mapState;
   return uniformBuffer;
 }
 
