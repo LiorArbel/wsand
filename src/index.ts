@@ -13,10 +13,15 @@ async function comp() {
   return { renderFunc, element };
 }
 
-(async () => {
+setTimeout(async () => {
   const { element, renderFunc } = await comp();
 
   document.body.appendChild(element);
 
+  const btn = document.createElement("button");
+  btn.textContent = "next frame";
+  btn.onclick = renderFunc;
+  document.body.appendChild(btn);
+
   renderFunc();
-})();
+}, 0);
