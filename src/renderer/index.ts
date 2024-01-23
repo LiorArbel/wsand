@@ -11,9 +11,9 @@ const startTime = new Date().getTime() / 1000;
 
 const getDeltaTime = () => new Date().getTime() / 1000 - startTime;
 
-const gameSize = {width: 12, height: 12};
+const gameSize = {width: 64, height: 64};
 
-const FRAME_DELAY = 1000;
+const FRAME_DELAY = 1;
 
 const uniformData = new Float32Array([
   // ♟️ ModelViewProjection Matrix (Identity)
