@@ -11,9 +11,9 @@ const startTime = new Date().getTime() / 1000;
 
 const getDeltaTime = () => new Date().getTime() / 1000 - startTime;
 
-const gameSize = {width: 64, height: 64};
+const gameSize = {width: 64*2, height: 64};
 
-const FRAME_DELAY = 1;
+const FRAME_DELAY = 0;
 
 const uniformData = new Float32Array([
   // ♟️ ModelViewProjection Matrix (Identity)
@@ -103,7 +103,7 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
     imageTexture
   );
 
-  const encodeCompute = setupComputePipeline(device, imageTexture, gameSize);
+  const encodeCompute = setupComputePipeline(device, imageTexture, gameSize, canvas);
 
   const pipeline = getPipeline(layout, device, fragModule, vertModule);
 
@@ -162,11 +162,13 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
 
     encodeCommands();
 
-    console.log("rendered");
-
-    setTimeout(() => {
-      requestAnimationFrame(render);
-    },FRAME_DELAY)
+    if(FRAME_DELAY > 0){
+      setTimeout(() => {
+        requestAnimationFrame(render);
+      },FRAME_DELAY)
+    } else {
+      requestAnimationFrame(render)
+    }
   };
 
   return render;

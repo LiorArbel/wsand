@@ -1,7 +1,11 @@
+import { getMouse } from "./mouse";
+import hsvConversions from "../shaders/hsv.rgb.wgsl";
+
 export function setupComputePipeline(
   device: GPUDevice,
   texture: GPUTexture,
-  size: { width: number; height: number }
+  size: { width: number; height: number },
+  canvas: HTMLCanvasElement
 ) {
   const swappingDataBindgroupLayout = device.createBindGroupLayout({
     entries: [
@@ -42,6 +46,13 @@ export function setupComputePipeline(
           type: "uniform",
         },
       },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: {
+          type: "uniform"
+        }
+      }
     ],
   });
 
@@ -53,15 +64,17 @@ export function setupComputePipeline(
       module: device.createShaderModule({
         code: `
         @group(0) @binding(0)
-        var<storage, read> in_data: array<vec3<f32>>;
+        var<storage, read> in_data: array<vec4<f32>>;
         @group(0) @binding(1) 
-        var<storage, read_write> out_data: array<vec3<f32>>;
+        var<storage, read_write> out_data: array<vec4<f32>>;
         @group(1) @binding(0)
         var out_image: texture_storage_2d<rgba8unorm, write>;
         @group(1) @binding(1)
         var<uniform> size: vec2<u32>;
         @group(1) @binding(2)
         var<uniform> frame: u32;
+        @group(1) @binding(3)
+        var<uniform> mouse: vec4<u32>;
 
         const BOUNDS:f32 = -1;
         const AIR:f32 = 0;
@@ -74,14 +87,14 @@ export function setupComputePipeline(
             return (pos.y % h) * w + (pos.x % w);
         }
 
-        fn getData(pos: vec2<u32>) -> vec3<f32> {
+        fn getData(pos: vec2<u32>) -> vec4<f32> {
             if(pos.x >= size.x || pos.y >= size.y){
-                return vec3(BOUNDS, 0,0);
+                return vec4(BOUNDS, 0,0,0);
             }
             return in_data[getIndex(pos)];
         }
 
-        fn setData(pos: vec2<u32>, data: vec3<f32>){
+        fn setData(pos: vec2<u32>, data: vec4<f32>){
             if(pos.x < size.x && pos.y < size.y){
                 out_data[getIndex(pos)] = data;
             }
@@ -104,21 +117,19 @@ export function setupComputePipeline(
         }
 
         fn drawNeighborhood(pos: vec2<u32>, n: Neighborhood){
-            textureStore(out_image, pos, vec4(n.c00,1));
-            if(n.c10.r != BOUNDS){
-                textureStore(out_image, pos+vec2(1,0), vec4(n.c10,1));
+            textureStore(out_image, pos, vec4(n.c00.xyz,1));
+            if(n.c10.a != BOUNDS){
+                textureStore(out_image, pos+vec2(1,0), vec4(n.c10.xyz,1));
             } 
-            if(n.c01.r != BOUNDS){
-                textureStore(out_image, pos+vec2(0,1), vec4(n.c01,1));
+            if(n.c01.a != BOUNDS){
+                textureStore(out_image, pos+vec2(0,1), vec4(n.c01.xyz,1));
             }
-            if(n.c11.r != BOUNDS){
-                textureStore(out_image, pos+vec2(1,1), vec4(n.c11,1));
+            if(n.c11.a != BOUNDS){
+                textureStore(out_image, pos+vec2(1,1), vec4(n.c11.xyz,1));
             }
-            // textureStore(out_image, pos, vec4(1,0,0,1));
-            // textureStore(out_image, pos+vec2(1,0), vec4(0,1,0,1));
-            // textureStore(out_image, pos+vec2(0,1), vec4(0,0,1,1));
-            // textureStore(out_image, pos+vec2(1,1), vec4(1,1,0,1));
         }
+
+        ${hsvConversions}
 
         // fn swap(a: vec3<f32>, b:vec3<f32>){
         //     let temp = a;
@@ -129,10 +140,10 @@ export function setupComputePipeline(
         // var<workgroup> sharedBlock : array<u32, 4>;
         
         struct Neighborhood {
-            c00: vec3<f32>,
-            c10: vec3<f32>,
-            c01: vec3<f32>,
-            c11: vec3<f32>,
+            c00: vec4<f32>,
+            c10: vec4<f32>,
+            c01: vec4<f32>,
+            c11: vec4<f32>,
         }
 
         fn getOffset() -> vec2<u32>{
@@ -158,159 +169,58 @@ export function setupComputePipeline(
         @builtin(local_invocation_id) local_id : vec3u
         )  {
             let pos = id.xy*2 + getOffset();
-            // let pos = id.xy*2 + vec2(frame % 2, frame / 2);
-            // textureStore(out_image, pos, vec4(1,0,0, 1));
-            // return;
-            // let pos = id.xy;
-            let local_pos = local_id.xy;
+            
             let pos_index = getIndex(pos);
 
-            // sharedBlock[local_pos.y * 2 + local_pos.x] = pos_index;
-
+            let r = hash43(vec3(pos, frame));
             var neigh = getNeighborhood(pos);
             var c00 = neigh.c00;
             var c01 = neigh.c01;
             var c10 = neigh.c10;
             var c11 = neigh.c11;
 
-            // if(neigh.c00.r == SAND && neigh.c01.r == SAND && neigh.c10.r == AIR && neigh.c11.r == AIR){
-            //     var temp = neigh.c00;
-            //     neigh.c00 = neigh.c11;
-            //     neigh.c11 = temp;
-            // }
+            if(c00.a != BOUNDS && mouse.z != 0 && distance(vec2<f32>(pos), vec2<f32>(mouse.xy)) < f32(mouse.w)){
+              if(mouse.z == 1){
+                let new_color = hsvToRgb(vec3(f32(frame)/1000, 0.7, 1));
+                neigh.c00 = vec4(new_color, SAND);
+              } else {
+                neigh.c00 = vec4(0, 0, 0, AIR);
+              }
+            }
 
-            // if(neigh.c00.r == SAND && neigh.c01.r == SAND && neigh.c10.r == SAND && neigh.c11.r == AIR){
-            //     var temp = neigh.c10;
-            //     neigh.c10 = neigh.c11;
-            //     neigh.c11 = temp;
-            // }
-
-            // if(neigh.c10.r == SAND && neigh.c11.r == SAND && neigh.c00.r == AIR && neigh.c01.r == AIR){
-            //     var temp = neigh.c10;
-            //     neigh.c10 = neigh.c01;
-            //     neigh.c01 = temp;
-            // }
-
-            // if(neigh.c10.r == SAND && neigh.c11.r == SAND && neigh.c00.r == SAND && neigh.c01.r == AIR){
-            //     var temp = neigh.c00;
-            //     neigh.c00 = neigh.c01;
-            //     neigh.c01 = temp;
-            // }
-
-            // if(neigh.c00.r == SAND && neigh.c01.r == AIR){
-            //     var temp = neigh.c00;
-            //     neigh.c00 = neigh.c01;
-            //     neigh.c01 = temp;
-            // }
-
-            // if(neigh.c10.r == SAND && neigh.c11.r == AIR){
-            //     var temp = neigh.c10;
-            //     neigh.c10 = neigh.c11;
-            //     neigh.c11 = temp;
-            // }
-            // if(neigh.c00.r < 0 && neigh.c01.r < 0 && neigh.c10.r < 0){
-            //   return;
-            // }
-            // if(neigh.c00.r < 0 && neigh.c10.r < 0 && neigh.c11.r < 0){
-            //   return;
-            // }
-            // if(neigh.c00.r < 0 && neigh.c01.r < 0 && neigh.c11.r < 0){
-            //   return;
-            // }
-            // if(neigh.c10.r < 0 && neigh.c01.r < 0 && neigh.c11.r < 0){
-            //   return;
-            // }
-            if(neigh.c00.r == SAND && neigh.c01.r == SAND && neigh.c10.r == AIR && neigh.c11.r == AIR){
+            
+            if(neigh.c00.a == SAND && neigh.c01.a == SAND && neigh.c10.a == AIR && neigh.c11.a == AIR){
               let temp = neigh.c00;
               neigh.c00 = neigh.c10;
               neigh.c10 = temp;
             }
 
-            if(neigh.c10.r == SAND && neigh.c11.r == SAND && neigh.c00.r == AIR && neigh.c01.r == AIR){
+            if(neigh.c10.a == SAND && neigh.c11.a == SAND && neigh.c00.a == AIR && neigh.c01.a == AIR){
               let temp = neigh.c01;
               neigh.c01 = neigh.c10;
               neigh.c10 = temp;
             }
             
-            if(neigh.c00.r == SAND && neigh.c01.r == AIR){
+            if(neigh.c00.a == SAND && neigh.c01.a == AIR){
               let temp = neigh.c00;
               neigh.c00 = neigh.c01;
               neigh.c01 = temp;
             }
 
-            if(neigh.c10.r == SAND && neigh.c11.r == AIR){
+            if(neigh.c10.a == SAND && neigh.c11.a == AIR){
               let temp = neigh.c10;
               neigh.c10 = neigh.c11;
               neigh.c11 = temp;
           }
 
-          let r = hash43(vec3(pos, frame));
-
-          //   if (( (c01.r == SAND && c11.r < SAND) ||
-          //   (c01.r < SAND && c11.r == SAND)) &&
-          //   c00.r < SAND && c10.r < SAND && r.x < 0.4)
-          // {
-          //   // swap(t01, t11);
-          //   let temp = c01;
-          //   c01 = c11;
-          //   c11 = temp;
-          // }
-        
-          // if (c01.r == SAND)
-          // {
-          //   if (c00.r < SAND)
-          //   {
-          //     if (r.y < 0.9) {
-          //       // swap(t01, t00);
-          //       let temp = c01;
-          //       c01 = c00;
-          //       c00 = temp;
-          //     }
-          //   } else if (c11.r < SAND && c10.r < SAND)
-          //   {
-          //     // swap(t01, t10);
-          //     let temp = c01;
-          //     c01 = c10;
-          //     c10 = temp;
-          //   }
-          // }
-        
-          // if (c11.r == SAND)
-          // {
-          //   if (c10.r < SAND)
-          //   {
-          //     if (r.y < 0.9) {
-          //       // swap(t11, t10);
-          //       let temp = c11;
-          //       c11 = c10;
-          //       c10 = temp;
-          //     }
-          //   } else if (c01.r < SAND && c00.r < SAND)
-          //   {
-          //     // swap(t11, t00);
-          //     let temp = c11;
-          //     c11 = c00;
-          //     c00 = temp;
-          //   }
-          // }
-
-          //   neigh.c00 = c00;
-          //   neigh.c01 = c01;
-          //   neigh.c10 = c10;
-          //   neigh.c11 = c11;
-
             drawNeighborhood(pos, neigh);
             writeNeighborhood(pos, neigh);
-            // if(out_data[pos_index].r > 0){
-            //   textureStore(out_image, pos, vec4(out_data[pos_index].r,0,0, 0.0));
+
+            // if(out_data[pos_index].a > 0){
+            //   textureStore(out_image, pos, vec4(out_data[pos_index].a,0,0, 0.0));
             // } else {
             //   textureStore(out_image, pos, vec4(0,0,1, 0.0));
             // }
-            // let pos2 = pos + vec2(1,0);
-            // if(pos2.x < size.x && pos2.y < size.y){
-            //     textureStore(out_image, pos2, vec4(1,0,0, 1));
-            // }
-            // textureStore(out_image, pos, vec4(in_data[pos_index], 1));
         }
         `,
       }),
@@ -338,32 +248,36 @@ export function setupComputePipeline(
     initialData[index] = -1;
     initialData[index + 1] = 1;
     initialData[index + 2] = 1;
+    initialData[index + 3] = -1;
     j = size.width - 1;
     index = (i * size.width + j) * 4;
     initialData[index] = -1;
     initialData[index + 1] = 1;
     initialData[index + 2] = 1;
+    initialData[index + 3] = -1;
   }
 
   for (let i = 0; i < size.width; i++) {
     let j = 0;
-    let index = (j * size.height + i) * 4;
+    let index = (j * size.width + i) * 4;
     initialData[index] = -1;
     initialData[index + 1] = 1;
     initialData[index + 2] = 1;
+    initialData[index + 3] = -1;
     j = size.height - 1;
-    index = (j * size.height + i) * 4;
+    index = (j * size.width + i) * 4;
     initialData[index] = -1;
     initialData[index + 1] = 1;
     initialData[index + 2] = 1;
+    initialData[index + 3] = -1;
   }
 
   const center = {
     x: Math.floor(size.width / 2),
     y: Math.floor(size.height / 2),
   };
-  const radius = size.width /2;
-  const halfRadius = Math.floor(radius/2);
+  const radius = 0;
+  const halfRadius = Math.floor(radius / 2);
 
   for (let j = center.y - halfRadius; j < center.y + halfRadius; j++) {
     for (let i = center.x - halfRadius; i < center.x + halfRadius; i++) {
@@ -371,11 +285,9 @@ export function setupComputePipeline(
       initialData[index] = 1;
       initialData[index + 1] = 1;
       initialData[index + 2] = 1;
+      initialData[index + 3] = 1;
     }
   }
-
-  console.log(initialData);
-  (window as unknown as any).initialData = initialData;
 
   const data0Buffer = device.createBuffer({
     size: size.height * size.width * Float32Array.BYTES_PER_ELEMENT * 4,
@@ -395,6 +307,11 @@ export function setupComputePipeline(
 
   const domainOffsetBuffer = device.createBuffer({
     size: Uint32Array.BYTES_PER_ELEMENT,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+
+  const mouseBuffer = device.createBuffer({
+    size: Uint32Array.BYTES_PER_ELEMENT * 4, //(16),
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
@@ -441,13 +358,25 @@ export function setupComputePipeline(
         binding: 2,
         resource: { buffer: domainOffsetBuffer },
       },
+      {
+        binding: 3,
+        resource: { buffer: mouseBuffer },
+      },
     ],
   });
 
+  const ratio = {x: canvas.width / size.width, y: canvas.height / size.height};
+  const drawingRadius = 5;
+
   let renders: number = 0;
   const encodeCompute = (encoder: GPUCommandEncoder) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouse = getMouse();
+    const relativeMouse = {x: clamp((mouse.x - rect.x)/ratio.x, 0, size.width-1), y: clamp((mouse.y - rect.y)/ratio.y, 0, size.height-1)};
+    relativeMouse.x = Math.floor(relativeMouse.x);
+    relativeMouse.y = Math.floor(relativeMouse.y);
     device.queue.writeBuffer(domainOffsetBuffer, 0, new Uint32Array([renders]));
-    console.log(renders % 4);
+    device.queue.writeBuffer(mouseBuffer, 0, new Uint32Array([relativeMouse.x, relativeMouse.y, mouse.leftClick ? 1 : mouse.rightClick ? -1 : 0, drawingRadius]));
     const pass = encoder.beginComputePass();
     pass.setPipeline(computePipeline);
     pass.setBindGroup(0, renders % 2 ? swap0Bindgroup : swap1Bindgroup);
@@ -461,7 +390,7 @@ export function setupComputePipeline(
   return encodeCompute;
 }
 
-function logStorageBuffer(device: GPUDevice, storageBuffer: GPUBuffer){
+function logStorageBuffer(device: GPUDevice, storageBuffer: GPUBuffer) {
   device.queue.onSubmittedWorkDone().then(() => {
     const copyEncoder = device.createCommandEncoder();
     const readBuffer = device.createBuffer({
@@ -494,3 +423,5 @@ function logStorageBuffer(device: GPUDevice, storageBuffer: GPUBuffer){
     });
   });
 }
+
+const clamp = (val: number, min:number, max:number) => Math.min(Math.max(val, min), max)
