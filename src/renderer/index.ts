@@ -127,8 +127,12 @@ export class Renderer {
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
+  destroyed = false;
   public initRenderLoop(){
     const renderLoop = () => {
+      if(this.destroyed){
+        return;
+      }
       this.render();
       if(this.frameDelay > 0){
         setTimeout(renderLoop, this.frameDelay);
@@ -137,6 +141,10 @@ export class Renderer {
       }
     }
     renderLoop();
+  }
+
+  public destroy(){
+    this.destroyed = true;
   }
 
   private getDeltaTime() {

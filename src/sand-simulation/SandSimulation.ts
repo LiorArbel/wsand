@@ -1,7 +1,6 @@
 import { getMouse } from "../renderer/mouse";
 import { createBuffers } from "./createBuffers";
 import { createLayoutsAndPipeline } from "./createLayoutsAndPipeline";
-import { getInitialData } from "./getInitialData";
 
 export class SandSimulation {
   ratio: {
@@ -131,8 +130,12 @@ export class SandSimulation {
       this.device.queue.submit([encoder.finish()]);
   }
 
+  destroyed = false;
   public initSimulationLoop(){
     const simLoop = () => {
+      if(this.destroyed){
+        return;
+      }
       this.draw();
       if(this.refreshRate > 0){
         setTimeout(simLoop, this.refreshRate);
@@ -141,6 +144,9 @@ export class SandSimulation {
       }
     }
     simLoop();
+  }
+  public destroy(){
+    this.destroyed = true;
   }
 }
 

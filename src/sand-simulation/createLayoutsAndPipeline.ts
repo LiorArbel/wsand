@@ -1,5 +1,5 @@
 import hsvConversions from "../shaders/hsv.rgb.wgsl";
-import sandCompute from "../sand-compute/sand.compute.wgsl";
+import sandCompute from "../sand-simulation/sand.compute.wgsl";
 
 export function createLayoutsAndPipeline(device: GPUDevice){
     const particleDataBindgroupLayout = device.createBindGroupLayout({

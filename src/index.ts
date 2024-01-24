@@ -1,12 +1,36 @@
 import { GameEngine } from "./GameEngine/GameEngine";
-import { Renderer } from "./renderer";
 
 async function comp() {
-  const engine = await GameEngine.createEngine();
   const root = document.createElement("div");
-  root.appendChild(engine.canvas);
+
+  const canvasContainer = document.createElement("div");
+  canvasContainer.className = "canvas-container";
+  root.appendChild(canvasContainer);
+
+  let engine: GameEngine|undefined;
+  let canvas: HTMLCanvasElement|undefined;
+
+  const reset = async() => {
+    if(engine != undefined){
+      engine.destroy();
+    }
+    engine = await GameEngine.createEngine();
+    if(canvas != undefined){
+      canvasContainer.removeChild(canvas);
+    }
+    canvas = engine.canvas;
+    canvasContainer.appendChild(canvas);
+    engine.init();
+  }
+
+  await reset();
   
-  engine.init()
+  const resetBtn = document.createElement("button");
+  resetBtn.textContent = "reset simulation";
+  resetBtn.addEventListener("click", () => {
+    reset();
+  })
+  root.appendChild(resetBtn)
 
   return root;
 }

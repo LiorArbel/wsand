@@ -1,15 +1,14 @@
 import { Renderer } from "../renderer";
-import { SandSimulation } from "../sand-compute/SandSimulation";
+import { SandSimulation } from "../sand-simulation/SandSimulation";
 
 export class GameEngine{
     renderer: Renderer;
     sandSimulation: SandSimulation;
     canvas: HTMLCanvasElement;
 
-    private constructor(canvas: HTMLCanvasElement, renderer: Renderer){
+    private constructor(canvas: HTMLCanvasElement, renderer: Renderer, size = { width: 256 * 2, height: 256 }){
         this.renderer = renderer;
         this.canvas = canvas;
-        const size = { width: 256 * 2, height: 256 };
         this.sandSimulation = new SandSimulation(renderer.device, size, canvas);
         this.sandSimulation.bindToTexture(this.renderer.imageTexture);
     }
@@ -25,5 +24,10 @@ export class GameEngine{
     public init(){
         this.renderer.initRenderLoop();
         this.sandSimulation.initSimulationLoop();
+    }
+
+    public destroy(){
+        this.renderer.destroy();
+        this.sandSimulation.destroy();
     }
 }
