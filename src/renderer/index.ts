@@ -1,6 +1,6 @@
 import vertShaderCode from "../shaders/triangle.vert.wgsl";
 import fragShaderCode from "../shaders/triangle.frag.wgsl";
-import { setupComputePipeline } from "./computePipeline";
+import { SandSimulation } from "../sand-compute/SandSimulation";
 import { createTexture } from "./createTexture";
 
 const explicitFeatures:string[] = [
@@ -103,7 +103,9 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
     imageTexture
   );
 
-  const encodeCompute = setupComputePipeline(device, imageTexture, gameSize, canvas);
+  const sandSimulation = new SandSimulation(device, gameSize, canvas);
+
+  sandSimulation.bindToTexture(imageTexture);
 
   const pipeline = getPipeline(layout, device, fragModule, vertModule);
 
@@ -149,7 +151,7 @@ export async function createRenderer(canvas: HTMLCanvasElement) {
     passEncoder.draw(6);
     passEncoder.end();
 
-    encodeCompute(commandEncoder);
+    sandSimulation.draw();
 
     uniformData[24] = getDeltaTime();
     queue.writeBuffer(uniformBuffer, uniformData.byteOffset, uniformData);
