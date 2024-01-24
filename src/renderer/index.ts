@@ -28,7 +28,7 @@ export class Renderer {
 
   public imageTexture: GPUTexture;
 
-  public static async createRenderer(canvas: HTMLCanvasElement) {
+  public static async createRenderer(canvas: HTMLCanvasElement, size: {width:number, height:number}) {
     const entry = navigator.gpu;
     if (!entry) {
       throw new Error("WebGPU is not supported on this browser.");
@@ -39,10 +39,10 @@ export class Renderer {
     // 💻 Logical Device
     const device = await getDevice(adapter);
 
-    return new Renderer(canvas, device);
+    return new Renderer(canvas, device, size);
   }
 
-  private constructor(canvas: HTMLCanvasElement, device: GPUDevice) {
+  private constructor(canvas: HTMLCanvasElement, device: GPUDevice, gameSize: {width:number, height:number}) {
     this.canvas = canvas;
     this.device = device;
 
@@ -151,10 +151,6 @@ export class Renderer {
     return new Date().getTime() / 1000 - this.startTime;
   }
 }
-
-const gameSize = { width: 256 * 2, height: 256 };
-
-const FRAME_DELAY = 1000 / 100;
 
 const startTime = new Date().getTime() / 1000;
 

@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 const App = () => {
-  const [gameSize,setGameSize] = useState({ width: 256 * 2, height: 256 });
+  const [gameSize,setGameSize] = useState({ width: 64 * 2, height: 64 });
   const canvasContainer = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

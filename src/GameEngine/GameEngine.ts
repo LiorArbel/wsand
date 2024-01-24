@@ -14,11 +14,11 @@ export class GameEngine{
         console.log("Game engine created");
     }
 
-    public static async createEngine(size = { width: 256 * 2, height: 256 }){
+    public static async createEngine(size = { width: 64 * 2, height: 64 }){
         const canvas = document.createElement("canvas");
         canvas.height = 512;
         canvas.width = 512*2;
-        const renderer = await Renderer.createRenderer(canvas);
+        const renderer = await Renderer.createRenderer(canvas, size);
         return new GameEngine(canvas, renderer, size);
     }
 
