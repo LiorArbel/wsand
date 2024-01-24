@@ -6,19 +6,20 @@ export class GameEngine{
     sandSimulation: SandSimulation;
     canvas: HTMLCanvasElement;
 
-    private constructor(canvas: HTMLCanvasElement, renderer: Renderer, size = { width: 256 * 2, height: 256 }){
+    private constructor(canvas: HTMLCanvasElement, renderer: Renderer, size: {width: number, height:number}){
         this.renderer = renderer;
         this.canvas = canvas;
         this.sandSimulation = new SandSimulation(renderer.device, size, canvas);
         this.sandSimulation.bindToTexture(this.renderer.imageTexture);
+        console.log("Game engine created");
     }
 
-    public static async createEngine(){
+    public static async createEngine(size = { width: 256 * 2, height: 256 }){
         const canvas = document.createElement("canvas");
         canvas.height = 512;
         canvas.width = 512*2;
         const renderer = await Renderer.createRenderer(canvas);
-        return new GameEngine(canvas, renderer);
+        return new GameEngine(canvas, renderer, size);
     }
 
     public init(){

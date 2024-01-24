@@ -5,11 +5,13 @@
   "author": "<lliorarbell@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "start":"webpack serve", 
+    "start": "webpack serve",
     "dev": "webpack serve",
     "build": "webpack"
   },
   "devDependencies": {
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
     "@webgpu/types": "^0.1.40",
     "ts-loader": "^9.5.1",
     "typescript": "^5.3.3",
@@ -19,6 +21,8 @@
   },
   "private": "true",
   "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "wgpu-matrix": "^2.5.1"
   }
 }

@@ -1,9 +1,15 @@
 const path = require('path');
+const webpack = require('webpack');
 
 module.exports = {
     mode: "none",
-    entry: './src/index.ts',
+    entry: './src/index.tsx',
     devtool: 'inline-source-map',
+    plugins: [
+        new webpack.DefinePlugin({
+            'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+        }),
+    ],
     module: {
         rules: [
             {
