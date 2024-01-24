@@ -7,7 +7,7 @@ export class SandSimulation {
     x: number,
     y: number,
   };
-  drawingRadius = 20;
+  brushSize = 20;
   refreshRate = 1000/144;
   size: { width: number; height: number };
   canvas: HTMLCanvasElement;
@@ -116,7 +116,7 @@ export class SandSimulation {
           relativeMouse.x,
           relativeMouse.y,
           mouse.leftClick ? 1 : mouse.rightClick ? -1 : 0,
-          this.drawingRadius,
+          this.brushSize,
         ])
       );
       const pass = encoder.beginComputePass();
