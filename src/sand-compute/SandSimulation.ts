@@ -9,6 +9,7 @@ export class SandSimulation {
     y: number,
   };
   drawingRadius = 20;
+  refreshRate = 1000/144;
   size: { width: number; height: number };
   canvas: HTMLCanvasElement;
   renders: number = 0;
@@ -88,7 +89,7 @@ export class SandSimulation {
     });
   }
 
-  public draw(){
+  private draw(){
     if(!this.particleDataBindgroup || !this.sizeImageBindGroup){
       console.error("Trying to draw before binding bindgroups!");
       return;
@@ -128,6 +129,18 @@ export class SandSimulation {
 
       this.renders++;
       this.device.queue.submit([encoder.finish()]);
+  }
+
+  public initSimulationLoop(){
+    const simLoop = () => {
+      this.draw();
+      if(this.refreshRate > 0){
+        setTimeout(simLoop, this.refreshRate);
+      } else {
+        requestAnimationFrame(simLoop);
+      }
+    }
+    simLoop();
   }
 }
 

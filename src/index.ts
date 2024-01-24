@@ -1,27 +1,18 @@
-import { createRenderer } from "./renderer";
+import { GameEngine } from "./GameEngine/GameEngine";
+import { Renderer } from "./renderer";
 
 async function comp() {
-  const canvas = document.createElement("canvas");
-  canvas.height = 512;
-  canvas.width = 512*2;
-  const renderFunc = await createRenderer(canvas);
-  const element = document.createElement("div");
+  const engine = await GameEngine.createEngine();
+  const root = document.createElement("div");
+  root.appendChild(engine.canvas);
+  
+  engine.init()
 
-  element.innerHTML = ["Hello", "typescript"].join(" ");
-  element.appendChild(canvas);
-
-  return { renderFunc, element };
+  return root;
 }
 
 setTimeout(async () => {
-  const { element, renderFunc } = await comp();
+  const element = await comp();
 
   document.body.appendChild(element);
-
-  const btn = document.createElement("button");
-  btn.textContent = "next frame";
-  btn.onclick = renderFunc;
-  document.body.appendChild(btn);
-
-  renderFunc();
 }, 0);

@@ -1,5 +1,3 @@
-import { createRenderer } from "./renderer";
-
 type EngineSetupOptions = {
   width: number;
   height: number;
@@ -21,7 +19,6 @@ export class Engine {
       console.warn("trying to initialize a started engine");
       return;
     }
-    this.renderer = await createRenderer(this.canvas);
     this.initialized = true;
   }
 }

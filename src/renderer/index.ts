@@ -1,19 +1,158 @@
 import vertShaderCode from "../shaders/triangle.vert.wgsl";
 import fragShaderCode from "../shaders/triangle.frag.wgsl";
-import { SandSimulation } from "../sand-compute/SandSimulation";
 import { createTexture } from "./createTexture";
 
-const explicitFeatures:string[] = [
+const explicitFeatures: string[] = [
   //"chromium-experimental-read-write-storage-texture"
 ];
 
+export class Renderer {
+  frameDelay = 1000 / 100;
+
+  private startTime = new Date().getTime() / 1000;
+
+  private canvas: HTMLCanvasElement
+  public device: GPUDevice;
+  private context: GPUCanvasContext;
+  private pipeline: GPURenderPipeline;
+
+  private depthTexture: GPUTexture;
+  private depthTextureView: GPUTextureView
+
+  private colorTexture: GPUTexture;
+  private colorTextureView: GPUTextureView;
+
+  private uniformBindGroup: GPUBindGroup;
+  private uniformBuffer: GPUBuffer;
+  private vertBuffer: GPUBuffer;
+
+  public imageTexture: GPUTexture;
+
+  public static async createRenderer(canvas: HTMLCanvasElement) {
+    const entry = navigator.gpu;
+    if (!entry) {
+      throw new Error("WebGPU is not supported on this browser.");
+    }
+
+    const adapter = await getAdapter(entry);
+
+    // 💻 Logical Device
+    const device = await getDevice(adapter);
+
+    return new Renderer(canvas, device);
+  }
+
+  private constructor(canvas: HTMLCanvasElement, device: GPUDevice) {
+    this.canvas = canvas;
+    this.device = device;
+
+    this.context = getContext(this.canvas, this.device);
+
+    this.depthTexture = device.createTexture({
+      size: [canvas.width, canvas.height, 1],
+      dimension: "2d",
+      format: "depth24plus-stencil8",
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+    });
+    this.depthTextureView = this.depthTexture.createView();
+
+    this.colorTexture = this.context.getCurrentTexture();
+    this.colorTextureView = this.colorTexture.createView();
+
+    const vertModule: GPUShaderModule = device.createShaderModule({ code: vertShaderCode });
+
+    const fragModule: GPUShaderModule = device.createShaderModule({ code: fragShaderCode });
+
+    const uniformBuffer = getUniformData(device);
+
+    this.imageTexture = createTexture(device, gameSize);
+
+    const { layout, uniformBindGroup } = getLayoutAndBindGroup(
+      device,
+      uniformBuffer,
+      this.imageTexture
+    );
+
+    this.uniformBindGroup = uniformBindGroup;
+    this.uniformBuffer = uniformBuffer;
+
+    // this.sandSimulation = new SandSimulation(device, gameSize, canvas);
+
+    // this.sandSimulation.bindToTexture(imageTexture);
+
+    this.pipeline = getPipeline(layout, device, fragModule, vertModule);
+
+    this.vertBuffer = getVertexBuffer(device);
+  }
+
+  private render(){
+    this.colorTexture = this.context.getCurrentTexture();
+    this.colorTextureView = this.colorTexture.createView();
+    
+    let colorAttachment: GPURenderPassColorAttachment = {
+      view: this.colorTextureView,
+      clearValue: { r: 0, g: 0, b: 0, a: 1 },
+      loadOp: "clear",
+      storeOp: "store",
+    };
+
+    const depthAttachment: GPURenderPassDepthStencilAttachment = {
+      view: this.depthTextureView,
+      depthClearValue: 1,
+      depthLoadOp: "clear",
+      depthStoreOp: "store",
+      stencilClearValue: 0,
+      stencilLoadOp: "clear",
+      stencilStoreOp: "store",
+    };
+
+    const commandEncoder = this.device.createCommandEncoder();
+
+    // 🖌️ Encode drawing commands
+    const passEncoder = commandEncoder.beginRenderPass({
+      colorAttachments: [colorAttachment],
+      depthStencilAttachment: depthAttachment,
+    });
+
+    passEncoder.setBindGroup(0, this.uniformBindGroup);
+    passEncoder.setPipeline(this.pipeline);
+    passEncoder.setViewport(0, 0, this.canvas.width, this.canvas.height, 0, 1);
+    passEncoder.setScissorRect(0, 0, this.canvas.width, this.canvas.height);
+    passEncoder.setVertexBuffer(0, this.vertBuffer);
+    passEncoder.draw(6);
+    passEncoder.end();
+
+    uniformData[24] = this.getDeltaTime();
+    this.device.queue.writeBuffer(this.uniformBuffer, uniformData.byteOffset, uniformData);
+    this.device.queue.submit([commandEncoder.finish()]);
+  }
+
+  public initRenderLoop(){
+    const renderLoop = () => {
+      this.render();
+      if(this.frameDelay > 0){
+        setTimeout(renderLoop, this.frameDelay);
+      } else {
+        requestAnimationFrame(renderLoop);
+      }
+    }
+    renderLoop();
+  }
+
+  private getDeltaTime() {
+    return new Date().getTime() / 1000 - this.startTime;
+  }
+}
+
+const gameSize = { width: 256 * 2, height: 256 };
+
+const FRAME_DELAY = 1000 / 100;
+
 const startTime = new Date().getTime() / 1000;
 
-const getDeltaTime = () => new Date().getTime() / 1000 - startTime;
-
-const gameSize = {width: 256*2, height: 256};
-
-const FRAME_DELAY = (1000/100);
+const getDeltaTime = () => {
+  return new Date().getTime() / 1000 - startTime;
+}
 
 const uniformData = new Float32Array([
   // ♟️ ModelViewProjection Matrix (Identity)
@@ -55,127 +194,6 @@ const uniformData = new Float32Array([
   0.0,
 ]);
 
-export async function createRenderer(canvas: HTMLCanvasElement) {
-  const entry = navigator.gpu;
-  if (!entry) {
-    throw new Error("WebGPU is not supported on this browser.");
-  }
-
-  // 🔌 Physical Device Adapter
-  const adapter = await getAdapter(entry);
-
-  // 💻 Logical Device
-  const device = await getDevice(adapter);
-
-  const queue = device.queue;
-
-  const context = await getContext(canvas, device);
-
-  // 🤔 Create Depth Backing
-  const depthTextureDesc: GPUTextureDescriptor = {
-    size: [canvas.width, canvas.height, 1],
-    dimension: "2d",
-    format: "depth24plus-stencil8",
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
-  };
-
-  const depthTexture: GPUTexture = device.createTexture(depthTextureDesc);
-  const depthTextureView: GPUTextureView = depthTexture.createView();
-
-  // ✋ Declare canvas context image handles
-  let colorTexture: GPUTexture = context.getCurrentTexture();
-  let colorTextureView: GPUTextureView = colorTexture.createView();
-
-  // ✋ Declare shader module handles
-  const vsmDesc = { code: vertShaderCode };
-  const vertModule: GPUShaderModule = device.createShaderModule(vsmDesc);
-
-  const fsmDesc = { code: fragShaderCode };
-  const fragModule: GPUShaderModule = device.createShaderModule(fsmDesc);
-
-  const uniformBuffer = getUniformData(device);
-
-  const imageTexture = createTexture(device, gameSize);
-
-  const { layout, uniformBindGroup } = await getLayoutAndBindGroup(
-    device,
-    uniformBuffer,
-    imageTexture
-  );
-
-  const sandSimulation = new SandSimulation(device, gameSize, canvas);
-
-  sandSimulation.bindToTexture(imageTexture);
-
-  const pipeline = getPipeline(layout, device, fragModule, vertModule);
-
-  const vertBuffer = getVertexBuffer(device);
-
-  // ✋ Declare command handles
-  let commandEncoder: GPUCommandEncoder;
-  let passEncoder: GPURenderPassEncoder;
-
-  // ✍️ Write commands to send to the GPU
-  const encodeCommands = () => {
-    let colorAttachment: GPURenderPassColorAttachment = {
-      view: colorTextureView,
-      clearValue: { r: 0, g: 0, b: 0, a: 1 },
-      loadOp: "clear",
-      storeOp: "store",
-    };
-
-    const depthAttachment: GPURenderPassDepthStencilAttachment = {
-      view: depthTextureView,
-      depthClearValue: 1,
-      depthLoadOp: "clear",
-      depthStoreOp: "store",
-      stencilClearValue: 0,
-      stencilLoadOp: "clear",
-      stencilStoreOp: "store",
-    };
-
-    const renderPassDesc: GPURenderPassDescriptor = {
-      colorAttachments: [colorAttachment],
-      depthStencilAttachment: depthAttachment,
-    };
-
-    commandEncoder = device.createCommandEncoder();
-    
-    // 🖌️ Encode drawing commands
-    passEncoder = commandEncoder.beginRenderPass(renderPassDesc);
-    passEncoder.setBindGroup(0, uniformBindGroup);
-    passEncoder.setPipeline(pipeline);
-    passEncoder.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
-    passEncoder.setScissorRect(0, 0, canvas.width, canvas.height);
-    passEncoder.setVertexBuffer(0, vertBuffer);
-    passEncoder.draw(6);
-    passEncoder.end();
-
-    sandSimulation.draw();
-
-    uniformData[24] = getDeltaTime();
-    queue.writeBuffer(uniformBuffer, uniformData.byteOffset, uniformData);
-    queue.submit([commandEncoder.finish()]);
-  };
-
-  const render = () => {
-    colorTexture = context.getCurrentTexture();
-    colorTextureView = colorTexture.createView();
-
-    encodeCommands();
-
-    if(FRAME_DELAY > 0){
-      setTimeout(() => {
-        requestAnimationFrame(render);
-      },FRAME_DELAY)
-    } else {
-      requestAnimationFrame(render)
-    }
-  };
-
-  return render;
-}
-
 function getUniformData(device: GPUDevice) {
   // ✋ Declare buffer handles
   const uniformBuffer: GPUBuffer = createBuffer(
@@ -186,7 +204,7 @@ function getUniformData(device: GPUDevice) {
   return uniformBuffer;
 }
 
-async function getLayoutAndBindGroup(
+function getLayoutAndBindGroup(
   device: GPUDevice,
   uniformBuffer: GPUBuffer,
   mainTexture: GPUTexture
@@ -258,7 +276,7 @@ async function getAdapter(entry: GPU) {
     throw new Error("Couldn't get adapter.");
   }
 
-  if(!explicitFeatures.every(f => adapter.features.has(f))){
+  if (!explicitFeatures.every((f) => adapter.features.has(f))) {
     console.error(explicitFeatures, [...adapter.features.values()]);
     throw new Error("Not all features available!");
   }
@@ -276,7 +294,7 @@ async function getDevice(adapter: GPUAdapter) {
   return device;
 }
 
-async function getContext(canvas: HTMLCanvasElement, device: GPUDevice) {
+function getContext(canvas: HTMLCanvasElement, device: GPUDevice) {
   // ✋ Declare context handle
   let context: GPUCanvasContext | null = null;
 
