@@ -8,17 +8,10 @@ export function setupComputePipeline(
   size: { width: number; height: number },
   canvas: HTMLCanvasElement
 ) {
-  const swappingDataBindgroupLayout = device.createBindGroupLayout({
+  const particleDataBindgroupLayout = device.createBindGroupLayout({
     entries: [
       {
         binding: 0,
-        visibility: GPUShaderStage.COMPUTE,
-        buffer: {
-          type: "read-only-storage",
-        },
-      },
-      {
-        binding: 1,
         visibility: GPUShaderStage.COMPUTE,
         buffer: {
           type: "storage",
@@ -59,7 +52,7 @@ export function setupComputePipeline(
 
   const computePipeline = device.createComputePipeline({
     layout: device.createPipelineLayout({
-      bindGroupLayouts: [swappingDataBindgroupLayout, sizeImageBindgroupLayout],
+      bindGroupLayouts: [particleDataBindgroupLayout, sizeImageBindgroupLayout],
     }),
     compute: {
       module: device.createShaderModule({
@@ -139,13 +132,6 @@ export function setupComputePipeline(
   });
   device.queue.writeBuffer(data0Buffer, 0, initialData);
 
-  const data1Buffer = device.createBuffer({
-    size: size.height * size.width * Float32Array.BYTES_PER_ELEMENT * 4,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.STORAGE,
-  });
-
-  device.queue.writeBuffer(data1Buffer, 0, initialData);
-
   const domainOffsetBuffer = device.createBuffer({
     size: Uint32Array.BYTES_PER_ELEMENT,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -156,34 +142,16 @@ export function setupComputePipeline(
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
-  const swap0Bindgroup = device.createBindGroup({
-    layout: swappingDataBindgroupLayout,
+  const particleDataBindgroup = device.createBindGroup({
+    layout: particleDataBindgroupLayout,
     entries: [
       {
         binding: 0,
         resource: { buffer: data0Buffer },
       },
-      {
-        binding: 1,
-        resource: { buffer: data1Buffer },
-      },
     ],
   });
-
-  const swap1Bindgroup = device.createBindGroup({
-    layout: swappingDataBindgroupLayout,
-    entries: [
-      {
-        binding: 0,
-        resource: { buffer: data1Buffer },
-      },
-      {
-        binding: 1,
-        resource: { buffer: data0Buffer },
-      },
-    ],
-  });
-
+  
   const sizeImageBindGroup = device.createBindGroup({
     layout: sizeImageBindgroupLayout,
     entries: [
@@ -220,7 +188,7 @@ export function setupComputePipeline(
     device.queue.writeBuffer(mouseBuffer, 0, new Uint32Array([relativeMouse.x, relativeMouse.y, mouse.leftClick ? 1 : mouse.rightClick ? -1 : 0, drawingRadius]));
     const pass = encoder.beginComputePass();
     pass.setPipeline(computePipeline);
-    pass.setBindGroup(0, renders % 2 ? swap0Bindgroup : swap1Bindgroup);
+    pass.setBindGroup(0, particleDataBindgroup);
     pass.setBindGroup(1, sizeImageBindGroup);
     pass.dispatchWorkgroups(size.width, size.height);
     pass.end();

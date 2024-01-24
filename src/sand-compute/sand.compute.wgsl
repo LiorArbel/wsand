@@ -1,7 +1,5 @@
 @group(0) @binding(0)
-var<storage, read> in_data: array<vec4<f32>>;
-@group(0) @binding(1) 
-var<storage, read_write> out_data: array<vec4<f32>>;
+var<storage, read_write> in_data: array<vec4<f32>>;
 @group(1) @binding(0)
 var out_image: texture_storage_2d<rgba8unorm, write>;
 @group(1) @binding(1)
@@ -31,7 +29,7 @@ fn getData(pos: vec2<u32>) -> vec4<f32> {
 
 fn setData(pos: vec2<u32>, data: vec4<f32>) {
     if pos.x < size.x && pos.y < size.y {
-        out_data[getIndex(pos)] = data;
+        in_data[getIndex(pos)] = data;
     }
 }
 
