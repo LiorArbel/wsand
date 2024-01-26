@@ -15,7 +15,7 @@ struct VSOut {
 };
 
 @vertex
-fn main(@location(0) in_pos: vec3<f32>, @location(1) in_color: vec3<f32>, @location(2) uv: vec2<f32>) -> VSOut {
+fn main(@location(0) in_pos: vec3<f32>, @location(1) in_color: vec3<f32>, @location(2) uv: vec2<f32>, @location(3) normal: vec3<f32>) -> VSOut {
     var vs_out: VSOut;
     let base_view = mat4x4f(
       1.0, 0.0, 0.0, 0.0,

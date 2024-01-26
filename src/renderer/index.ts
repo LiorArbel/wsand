@@ -1,23 +1,31 @@
 import vertShaderCode from "../shaders/triangle.vert.wgsl";
 import fragShaderCode from "../shaders/triangle.frag.wgsl";
 import { createTexture } from "./createTexture";
+import { Mesh } from "./Mesh";
 
 const explicitFeatures: string[] = [
   //"chromium-experimental-read-write-storage-texture"
 ];
+
+export interface Renderable {
+  vertices: GPUBuffer;
+  indices: GPUBuffer;
+  indexCount: number;
+  bindGroup?: GPUBindGroup;
+}
 
 export class Renderer {
   frameDelay = 1000 / 100;
 
   private startTime = new Date().getTime() / 1000;
 
-  private canvas: HTMLCanvasElement
+  private canvas: HTMLCanvasElement;
   public device: GPUDevice;
   private context: GPUCanvasContext;
   private pipeline: GPURenderPipeline;
 
   private depthTexture: GPUTexture;
-  private depthTextureView: GPUTextureView
+  private depthTextureView: GPUTextureView;
 
   private colorTexture: GPUTexture;
   private colorTextureView: GPUTextureView;
@@ -26,9 +34,15 @@ export class Renderer {
   private uniformBuffer: GPUBuffer;
   private vertBuffer: GPUBuffer;
 
+  private renderables: Renderable[] = [];
+  meshes: Mesh[] = [];
+
   public imageTexture: GPUTexture;
 
-  public static async createRenderer(canvas: HTMLCanvasElement, size: {width:number, height:number}) {
+  public static async createRenderer(
+    canvas: HTMLCanvasElement,
+    size: { width: number; height: number }
+  ) {
     const entry = navigator.gpu;
     if (!entry) {
       throw new Error("WebGPU is not supported on this browser.");
@@ -42,7 +56,11 @@ export class Renderer {
     return new Renderer(canvas, device, size);
   }
 
-  private constructor(canvas: HTMLCanvasElement, device: GPUDevice, gameSize: {width:number, height:number}) {
+  private constructor(
+    canvas: HTMLCanvasElement,
+    device: GPUDevice,
+    gameSize: { width: number; height: number }
+  ) {
     this.canvas = canvas;
     this.device = device;
 
@@ -59,9 +77,13 @@ export class Renderer {
     this.colorTexture = this.context.getCurrentTexture();
     this.colorTextureView = this.colorTexture.createView();
 
-    const vertModule: GPUShaderModule = device.createShaderModule({ code: vertShaderCode });
+    const vertModule: GPUShaderModule = device.createShaderModule({
+      code: vertShaderCode,
+    });
 
-    const fragModule: GPUShaderModule = device.createShaderModule({ code: fragShaderCode });
+    const fragModule: GPUShaderModule = device.createShaderModule({
+      code: fragShaderCode,
+    });
 
     const uniformBuffer = getUniformData(device);
 
@@ -76,19 +98,15 @@ export class Renderer {
     this.uniformBindGroup = uniformBindGroup;
     this.uniformBuffer = uniformBuffer;
 
-    // this.sandSimulation = new SandSimulation(device, gameSize, canvas);
-
-    // this.sandSimulation.bindToTexture(imageTexture);
-
     this.pipeline = getPipeline(layout, device, fragModule, vertModule);
 
     this.vertBuffer = getVertexBuffer(device);
   }
 
-  private render(){
+  private render() {
     this.colorTexture = this.context.getCurrentTexture();
     this.colorTextureView = this.colorTexture.createView();
-    
+
     let colorAttachment: GPURenderPassColorAttachment = {
       view: this.colorTextureView,
       clearValue: { r: 0, g: 0, b: 0, a: 1 },
@@ -114,36 +132,67 @@ export class Renderer {
       depthStencilAttachment: depthAttachment,
     });
 
-    passEncoder.setBindGroup(0, this.uniformBindGroup);
     passEncoder.setPipeline(this.pipeline);
-    passEncoder.setViewport(0, 0, this.canvas.width, this.canvas.height, 0, 1);
+    passEncoder.setViewport(
+      0,
+      0,
+      this.canvas.width,
+      this.canvas.height,
+      0,
+      1
+    );
     passEncoder.setScissorRect(0, 0, this.canvas.width, this.canvas.height);
-    passEncoder.setVertexBuffer(0, this.vertBuffer);
-    passEncoder.draw(6);
+    passEncoder.setBindGroup(0, this.uniformBindGroup);
+
+    this.meshes.forEach((mesh) => {
+      if(!mesh.renderable){
+        mesh.createRenderable(this.device);
+      }
+      const renderable = mesh.renderable!;
+      if(renderable.bindGroup){
+        passEncoder.setBindGroup(0, renderable.bindGroup);
+      }
+      passEncoder.setVertexBuffer(0, renderable.vertices);
+      passEncoder.setIndexBuffer(renderable.indices, 'uint16');
+      passEncoder.draw(renderable.indexCount);
+    });
+    
     passEncoder.end();
 
+    // passEncoder.setBindGroup(0, this.uniformBindGroup);
+    // passEncoder.setPipeline(this.pipeline);
+    // passEncoder.setViewport(0, 0, this.canvas.width, this.canvas.height, 0, 1);
+    // passEncoder.setScissorRect(0, 0, this.canvas.width, this.canvas.height);
+    // passEncoder.setVertexBuffer(0, this.vertBuffer);
+    // passEncoder.draw(6);
+    // passEncoder.end();
+
     uniformData[24] = this.getDeltaTime();
-    this.device.queue.writeBuffer(this.uniformBuffer, uniformData.byteOffset, uniformData);
+    this.device.queue.writeBuffer(
+      this.uniformBuffer,
+      uniformData.byteOffset,
+      uniformData
+    );
     this.device.queue.submit([commandEncoder.finish()]);
   }
 
   destroyed = false;
-  public initRenderLoop(){
+  public initRenderLoop() {
     const renderLoop = () => {
-      if(this.destroyed){
+      if (this.destroyed) {
         return;
       }
       this.render();
-      if(this.frameDelay > 0){
+      if (this.frameDelay > 0) {
         setTimeout(renderLoop, this.frameDelay);
       } else {
         requestAnimationFrame(renderLoop);
       }
-    }
+    };
     renderLoop();
   }
 
-  public destroy(){
+  public destroy() {
     this.destroyed = true;
   }
 
@@ -156,7 +205,7 @@ const startTime = new Date().getTime() / 1000;
 
 const getDeltaTime = () => {
   return new Date().getTime() / 1000 - startTime;
-}
+};
 
 const uniformData = new Float32Array([
   // ♟️ ModelViewProjection Matrix (Identity)
@@ -414,22 +463,31 @@ function getPipeline(
       {
         attributes: [
           {
+            //position
             shaderLocation: 0, // @location(0)
             offset: 0,
             format: "float32x3",
           },
           {
+            // color
             shaderLocation: 1, // @location(1)
             offset: 4 * 3,
             format: "float32x3",
           },
           {
+            // uv
             shaderLocation: 2, // @location(2)
             offset: 4 * 6,
             format: "float32x2",
           },
+          {
+            // normal
+            shaderLocation: 3, // @location(2)
+            offset: 4 * 8,
+            format: "float32x3",
+          },
         ],
-        arrayStride: 4 * 8, // sizeof(float) * 8
+        arrayStride: 4 * 11, // sizeof(float) * 11
         stepMode: "vertex",
       },
     ],
