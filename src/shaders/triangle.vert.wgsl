@@ -5,8 +5,15 @@ struct UBO {
   deltaTime: f32
 };
 
+struct MeshUniforms {
+  transform: mat4x4<f32>
+}
+
 @group(0) @binding(0)
 var<uniform> uniforms: UBO;
+
+@group(1) @binding(0)
+var<uniform> mesh_uniforms: MeshUniforms;
 
 struct VSOut {
     @builtin(position) position: vec4<f32>,
@@ -23,7 +30,7 @@ fn main(@location(0) in_pos: vec3<f32>, @location(1) in_color: vec3<f32>, @locat
       0.0, 0.0, 1.0, 0.0,
       0.0, 0.0, 0.0, 1.0
     );
-    vs_out.position = base_view*uniforms.modelViewProj * vec4<f32>(in_pos, 1.0);
+    vs_out.position = base_view*uniforms.modelViewProj * mesh_uniforms.transform * vec4<f32>(in_pos, 1.0);
     // vs_out.color = in_color + vec3<f32>(0,0.0,0.0);
     vs_out.color = vec3(uv, 0);
     vs_out.uv = uv;

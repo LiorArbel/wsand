@@ -12,6 +12,7 @@ export interface Renderable {
   indices: GPUBuffer;
   indexCount: number;
   bindGroup?: GPUBindGroup;
+  onBeforeRender?: Function
 }
 
 export class Renderer {
@@ -149,8 +150,11 @@ export class Renderer {
         mesh.createRenderable(this.device);
       }
       const renderable = mesh.renderable!;
+      if(renderable.onBeforeRender){
+        renderable.onBeforeRender();
+      }
       if(renderable.bindGroup){
-        passEncoder.setBindGroup(0, renderable.bindGroup);
+        passEncoder.setBindGroup(1, renderable.bindGroup);
       }
       passEncoder.setVertexBuffer(0, renderable.vertices);
       passEncoder.setIndexBuffer(renderable.indices, 'uint16');
@@ -311,10 +315,12 @@ function getLayoutAndBindGroup(
       },
     ],
   });
+  
+  Mesh.createBindGroupLayout(device);
 
   // 🗂️ Pipeline Layout
   // 👩‍🔧 This would be used as a member of a GPUPipelineDescriptor when *creating a pipeline*
-  const pipelineLayoutDesc = { bindGroupLayouts: [uniformBindGroupLayout] };
+  const pipelineLayoutDesc = { bindGroupLayouts: [uniformBindGroupLayout, Mesh.bindGroupLayout] };
   const layout: GPUPipelineLayout =
     device.createPipelineLayout(pipelineLayoutDesc);
 
