@@ -7,7 +7,7 @@ export class SandSimulation {
     x: number,
     y: number,
   };
-  brushSize = 20;
+  brushSize = 5;
   refreshRate = 1000/144;
   size: { width: number; height: number };
   canvas: HTMLCanvasElement;
