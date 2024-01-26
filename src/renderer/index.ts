@@ -2,6 +2,7 @@ import vertShaderCode from "../shaders/triangle.vert.wgsl";
 import fragShaderCode from "../shaders/triangle.frag.wgsl";
 import { createTexture } from "./createTexture";
 import { Mesh } from "./Mesh";
+import { Mat4, mat4, vec3 } from "wgpu-matrix";
 
 const explicitFeatures: string[] = [
   //"chromium-experimental-read-write-storage-texture"
@@ -37,6 +38,7 @@ export class Renderer {
 
   private renderables: Renderable[] = [];
   meshes: Mesh[] = [];
+  camera: Mat4 = mat4.identity();
 
   public imageTexture: GPUTexture;
 
@@ -172,6 +174,7 @@ export class Renderer {
     // passEncoder.end();
 
     uniformData[24] = this.getDeltaTime();
+    uniformData.subarray(0, this.camera.length).set(this.camera);
     this.device.queue.writeBuffer(
       this.uniformBuffer,
       uniformData.byteOffset,
@@ -212,23 +215,24 @@ const getDeltaTime = () => {
 };
 
 const uniformData = new Float32Array([
-  // ♟️ ModelViewProjection Matrix (Identity)
-  1.0,
-  0.0,
-  0.0,
-  0.0,
-  0.0,
-  1.0,
-  0.0,
-  0.0,
-  0.0,
-  0.0,
-  1.0,
-  0.0,
-  0.0,
-  0.0,
-  0.0,
-  1.0,
+  // ♟️ ModelViewProjection Matrix
+  ...(mat4.translate(mat4.perspective(70 * Math.PI/180, 2/1, 0, 300), vec3.create(0,0, -0.0)) as Float32Array),
+  // 1.0,
+  // 0.0,
+  // 0.0,
+  // 0.0,
+  // 0.0,
+  // 1.0,
+  // 0.0,
+  // 0.0,
+  // 0.0,
+  // 0.0,
+  // 1.0,
+  // 0.0,
+  // 0.0,
+  // 0.0,
+  // 0.0,
+  // 1.0,
 
   // 🔴 Primary Color
   0.9,

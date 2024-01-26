@@ -48,10 +48,26 @@ export const useEngine = (canvasContainer: React.RefObject<HTMLElement>) => {
     }
   }, [brushSize]);
 
+  const useEngineState = <T>(getter: (engine: GameEngine) => T, setter: (engine: GameEngine, value: T) => void, defaultValue?:T):[T|undefined, (val:T) => void] => {
+    const [uiState, setUiState] = useState(engine.current ? getter(engine.current) : defaultValue);
+  
+    const setWholeState = (val: T) => {
+      if(!engine.current){
+        return;
+      }
+      console.log(uiState);
+      setUiState(val);
+      setter(engine.current, val);
+    }
+  
+    return [uiState, setWholeState];
+  }
+
   return {
     setGameSize,
     resetGame,
     brushSize,
-    setBrushSize
+    setBrushSize,
+    useEngineState
   }
 }

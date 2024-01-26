@@ -20,11 +20,20 @@ module.exports = {
             {
                 test: /\.wgsl/,
                 type: 'asset/source'
-            }
+            },
+            {
+                test: /\.css$/i,
+                use: ["style-loader", "css-loader"],
+            },
+            {
+                test: /\.(png|jpe?g|gif|svg|eot|ttf|woff|woff2)$/i,
+                // More information here https://webpack.js.org/guides/asset-modules/
+                type: "asset",
+            },
         ],
     },
     resolve: {
-        extensions: ['.tsx', '.ts', '.js'],
+        extensions: ['.tsx', '.ts', '.js']
     },
     output: {
         filename: 'main.js',
