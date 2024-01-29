@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback } from "react";
 import { Camera } from "../GameEngine/Camera";
 import { Object3D } from "../GameEngine/Object3D";
 import { BehaviorSubject, map } from "rxjs";
 import { useEngine } from "./engineContext";
+import { GameEngine } from "../GameEngine/GameEngine";
 
 const round = (num: number) => {
   return Math.round(num*100)/100;
@@ -16,13 +17,14 @@ export function CameraController({
   camera: Camera;
 }) {
   const { useEngineSubject } = useEngine();
-  const [cameraTran] = useEngineSubject((engine) => {
+  const camPosGetter = useCallback((engine:GameEngine) => {
     const posSubject = new BehaviorSubject(engine.camera.value.o3d);
     engine.camera.pipe(map((c) => c.o3d)).subscribe((v) => {
       posSubject.next(v);
     });
     return posSubject;
-  });
+  }, [])
+  const [cameraTran] = useEngineSubject(camPosGetter);
 
   const commitCam = useCallback(() => {
     const newCam = new Camera(

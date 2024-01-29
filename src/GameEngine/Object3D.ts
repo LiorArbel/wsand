@@ -41,6 +41,15 @@ export class Object3D {
     return new Object3D(this._position, this._rotation, this._scale);
   }
 
+  getForwad(){
+    const quat = Object3D.ToQuaternion(this._rotation);
+    return vec3.transformQuat(vec3.create(0,0,1), quat);
+  }
+
+  getQuat(){
+    return Object3D.ToQuaternion(this._rotation);
+  }
+
   private cachedTrasnfrom:Mat4|undefined = undefined;
   getGlobalTransform() {
     if(!this.cachedTrasnfrom || this.dirty){

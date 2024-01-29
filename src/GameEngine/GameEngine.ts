@@ -103,11 +103,11 @@ export class GameEngine {
     const camMovement = vec3.create();
     let moved = false;
     if (this.keyboard.isDown("w")) {
-      camMovement[2] += this.moveSpeed * delta;
+      camMovement[2] -= this.moveSpeed * delta;
       moved = true;
     }
     if (this.keyboard.isDown("s")) {
-      camMovement[2] -= this.moveSpeed * delta;
+      camMovement[2] += this.moveSpeed * delta;
       moved = true;
     }
     if (this.keyboard.isDown("a")) {
@@ -118,9 +118,18 @@ export class GameEngine {
       camMovement[0] += this.moveSpeed * delta;
       moved = true;
     }
+    if (this.keyboard.isDown("q")) {
+      this.camera.value.o3d.rotation[1] += this.moveSpeed*10 * delta *Math.PI/180;
+      moved = true;
+    }
+    if (this.keyboard.isDown("e")) {
+      this.camera.value.o3d.rotation[1] -= this.moveSpeed*10 * delta *Math.PI/180;
+      moved = true;
+    }
     if(moved){
+      const localForward = this.camera.value.o3d.getForwad();
       const new3D = this.camera.value.o3d.clone();
-      vec3.add(new3D.position, camMovement, new3D.position);
+      vec3.add(new3D.position, vec3.transformQuat(camMovement,this.camera.value.o3d.getQuat()), new3D.position);
       this.camera.value.o3d = new3D;
       this.camera.next(this.camera.value);
     }

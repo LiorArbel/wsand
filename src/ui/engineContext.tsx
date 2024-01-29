@@ -89,14 +89,14 @@ export const useEngine = () => {
   const useEngineSubject = <T,>(
     getter: (engine: GameEngine) => BehaviorSubject<T>
   ):[T, (val: T) => void] => {
-    const bs = getter(engine);
+    const bs = useMemo(() => getter(engine), [engine, getter]);
     const subscribe = useCallback((onChange: () => void) => {
-      const subscription= bs.subscribe(onChange)
+      const subscription = bs.subscribe(onChange)
       return () => subscription.unsubscribe;
-    }, [getter]);
+    }, [bs]);
     const value = useSyncExternalStore(subscribe, () => bs.value);
 
-    const setValue = useCallback((val: T) => bs.next(val), [getter]);
+    const setValue = useCallback((val: T) => bs.next(val), [bs]);
 
     return [value, setValue];
   };
