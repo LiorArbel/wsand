@@ -52,7 +52,7 @@ export class GameEngine {
 
     const gameObject1: GameObject = {
       update: (delta) => {
-        const rotation = Math.PI / 10000;
+        const rotation = 15 * Math.PI/180;
         mat4.rotateZ(mesh.transform, delta * rotation, mesh.transform);
       },
     };
