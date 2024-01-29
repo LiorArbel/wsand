@@ -10,6 +10,7 @@
     "build": "webpack"
   },
   "devDependencies": {
+    "@types/lodash": "^4.14.202",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "@webgpu/types": "^0.1.40",
@@ -23,6 +24,7 @@
   },
   "private": "true",
   "dependencies": {
+    "lodash": "^4.17.21",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "rxjs": "^7.8.1",
