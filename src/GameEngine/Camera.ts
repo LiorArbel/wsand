@@ -1,4 +1,4 @@
-import { mat4 } from "wgpu-matrix";
+import { mat4, vec3 } from "wgpu-matrix";
 import { Object3D } from "./Object3D";
 
 export class Camera {
@@ -18,12 +18,8 @@ export class Camera {
       this.near,
       this.far
     );
-    // Return the combined view-projection matrix
-    return mat4.multiply(projectionMatrix, viewMatrix);
-    return mat4.multiply(
-      mat4.inverse(this.o3d.getGlobalTransform()),
-      mat4.perspective(this.fov, this.aspect, this.near, this.far)
-    );
+    // Return the combined view-projection matrix upside down
+    return mat4.scale(mat4.multiply(projectionMatrix, viewMatrix), vec3.create(1,-1,1));
   }
 
   constructor(
