@@ -165,14 +165,6 @@ export class Renderer {
     
     passEncoder.end();
 
-    // passEncoder.setBindGroup(0, this.uniformBindGroup);
-    // passEncoder.setPipeline(this.pipeline);
-    // passEncoder.setViewport(0, 0, this.canvas.width, this.canvas.height, 0, 1);
-    // passEncoder.setScissorRect(0, 0, this.canvas.width, this.canvas.height);
-    // passEncoder.setVertexBuffer(0, this.vertBuffer);
-    // passEncoder.draw(6);
-    // passEncoder.end();
-
     uniformData[24] = this.getDeltaTime();
     uniformData.subarray(0, this.camera.length).set(this.camera);
     this.device.queue.writeBuffer(
