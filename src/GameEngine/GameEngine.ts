@@ -6,6 +6,7 @@ import { Keyboard } from "./Keyboard";
 import { Object3D } from "./Object3D";
 import { Camera } from "./Camera";
 import { BehaviorSubject } from "rxjs";
+import { Texture } from "../renderer/Texture";
 
 export interface GameObject {
   update?: (delta: number) => void;
@@ -34,21 +35,45 @@ export class GameEngine {
       new Camera(new Object3D(), (70 * Math.PI) / 180, 2, 0.1, 1000)
     );
     this.sandSimulation = new SandSimulation(renderer.device, size, canvas);
-    this.sandSimulation.bindToTexture(this.renderer.imageTexture);
+
+    const sandTexture = new Texture(renderer.device, new Uint8Array(size.height * size.width * 4), size);
+    this.sandSimulation.bindToTexture(sandTexture.texture);
 
     const mesh = new Mesh(
       new Float32Array([1.0, -1.0, 0.0, -1.0, -1.0, 0.0, 0.0, 1.0, 0.0]),
       new Uint16Array([0, 1, 2]),
-      mat4.identity(),
+      mat4.translation(vec3.create(5, 0, 0.0001)),
       new Float32Array([0, 0, 1, 0, 1, 1])
     );
 
     const mesh2 = new Mesh(
       new Float32Array([1.0, -1.0, 0.0, -1.0, -1.0, 0.0, 0.0, 1.0, 0.0]),
-      new Uint16Array([0, 1, 2]),
-      mat4.translation(vec3.create(1, 0, 0.0001)),
-      new Float32Array([0, 0, 1, 0, 1, 1])
+      new Uint16Array([0, 1 , 2]),
+      mat4.translation(vec3.create(-3, 0, 2)),
+      new Float32Array([1, 0, 0, 1, 1, 1])
     );
+
+    const mesh3 = new Mesh(
+      new Float32Array([
+        -1.0, -1.0, 0.0, 
+        -1.0, 1.0, 0.0, 
+        1.0, -1.0, 0.0, 
+        1.0, -1.0, 0.0,
+        -1.0, 1.0, 0.0,
+        1.0, 1.0, 0.0
+      ]),
+      new Uint16Array([0, 1, 2, 3, 4, 5]),
+      mat4.scale(mat4.translation(vec3.create(0,0,1.42)), vec3.create(2,1,1)),
+      new Float32Array([
+        0, 0,
+        0, 1, 
+        1, 0, 
+        1, 0, 
+        0, 1, 
+        1, 1
+      ])
+    );
+    mesh3.texture = sandTexture;
 
     const gameObject1: GameObject = {
       update: (delta) => {
@@ -57,7 +82,7 @@ export class GameEngine {
       },
     };
 
-    renderer.meshes.push(...[mesh, mesh2]);
+    renderer.meshes.push(...[mesh, mesh2, mesh3]);
     this.gameObjects.push(gameObject1);
     console.log("Game engine created");
   }

@@ -1,5 +1,6 @@
 import { Mat4, mat4 } from "wgpu-matrix";
 import { Renderable } from ".";
+import { Texture } from "./Texture";
 
 export class Mesh {
   vertices: Float32Array;
@@ -7,11 +8,12 @@ export class Mesh {
   colors: Float32Array;
   normals: Float32Array;
   indices: Uint16Array;
-  texture?: GPUTexture;
+  texture?: Texture;
   transform: Mat4;
-
+  
   renderable?: Renderable;
-
+  
+  static defaultTexture: Texture;
   static bindGroupLayout: GPUBindGroupLayout;
 
   constructor(
@@ -34,12 +36,29 @@ export class Mesh {
     this.bindGroupLayout = device.createBindGroupLayout({
       entries: [
         {
-          binding: 0,
+          binding: 0, //transform
           buffer: {},
           visibility: GPUShaderStage.VERTEX,
         },
+        {
+          binding: 1, // options
+          buffer: {},
+          visibility: GPUShaderStage.FRAGMENT | GPUShaderStage.VERTEX
+        },
+        {
+          binding: 2, // texture
+          texture: {},
+          visibility: GPUShaderStage.FRAGMENT,
+        },
+        {
+          binding: 3, // sampler
+          sampler: {},
+          visibility: GPUShaderStage.FRAGMENT,
+        },
       ],
     });
+
+    this.defaultTexture = new Texture(device, new Uint8Array([255, 255, 255, 255]), {height: 1, width: 1});
   }
 
   private buildVertexBuffer(device: GPUDevice) {
@@ -61,19 +80,19 @@ export class Mesh {
       vertexBuffer[idx] = this.vertices[i * 3];
       vertexBuffer[idx + 1] = this.vertices[i * 3 + 1];
       vertexBuffer[idx + 2] = this.vertices[i * 3 + 2];
-      if (this.colors[i * 3]) {
+      if (this.colors[i * 3] !== undefined) {
         vertexBuffer[idx + 3] = this.colors[i * 3];
         vertexBuffer[idx + 4] = this.colors[i * 3 + 1];
         vertexBuffer[idx + 5] = this.colors[i * 3 + 2];
       }
-      if (this.uvs[i * 2]) {
+      if (this.uvs[i * 2] !== undefined) {
         vertexBuffer[idx + 6] = this.uvs[i * 2];
         vertexBuffer[idx + 7] = this.uvs[i * 2 + 1];
       }
-      if (this.normals[i * 3]) {
+      if (this.normals[i * 3] !== undefined) {
         vertexBuffer[idx + 8] = this.normals[i * 3];
         vertexBuffer[idx + 9] = this.normals[i * 3 + 1];
-        vertexBuffer[idx + 9] = this.normals[i * 3 + 2];
+        vertexBuffer[idx + 10] = this.normals[i * 3 + 2];
       }
     }
     actualBuffer.unmap();
@@ -98,6 +117,15 @@ export class Mesh {
     });
     new Float32Array(uniformBuffer.getMappedRange()).set(this.transform);
     uniformBuffer.unmap();
+
+    const optionsBuffer = device.createBuffer({
+      size: 4, //mat4 * f32
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+    new Float32Array(optionsBuffer.getMappedRange()).set([]);
+    optionsBuffer.unmap();
+
     const uniformBindgroup = device.createBindGroup({
       layout: Mesh.bindGroupLayout,
       entries: [
@@ -107,6 +135,20 @@ export class Mesh {
             buffer: uniformBuffer,
           },
         },
+        {
+          binding: 1,
+          resource: {
+            buffer: optionsBuffer
+          }
+        },
+        {
+          binding: 2,
+          resource: this.texture ? this.texture.view : Mesh.defaultTexture.view
+        },
+        {
+          binding: 3,
+          resource: this.texture ? this.texture.sampler : Mesh.defaultTexture.sampler
+        }
       ],
     });
 
